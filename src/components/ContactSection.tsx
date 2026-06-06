@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Mail, MapPin, GraduationCap, Linkedin, Github, Send } from 'lucide-react'
 
 export default function ContactSection() {
-  const [sent, setSent] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -11,19 +11,35 @@ export default function ContactSection() {
     message: '',
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const subject = form.subject.trim() || `Portfolio message from ${form.name}`
-    const body = [
-      `Name: ${form.name}`,
-      `Email: ${form.email}`,
-      '',
-      form.message,
-    ].join('\n')
+    setStatus('sending')
 
-    window.location.href = `mailto:shabbirhnadaf@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    setSent(true)
-    setTimeout(() => setSent(false), 3200)
+    const payload = new FormData()
+    payload.append('name', form.name)
+    payload.append('email', form.email)
+    payload.append('_replyto', form.email)
+    payload.append('subject', form.subject.trim() || `Portfolio message from ${form.name}`)
+    payload.append('message', form.message)
+    payload.append('_subject', form.subject.trim() || `Portfolio message from ${form.name}`)
+    payload.append('_captcha', 'false')
+    payload.append('_template', 'table')
+
+    try {
+      const response = await fetch('https://formsubmit.co/ajax/shabbirhnadaf@gmail.com', {
+        method: 'POST',
+        body: payload,
+        headers: { Accept: 'application/json' },
+      })
+
+      if (!response.ok) throw new Error('Message request failed')
+
+      setStatus('sent')
+      setForm({ name: '', email: '', subject: '', message: '' })
+      setTimeout(() => setStatus('idle'), 4200)
+    } catch {
+      setStatus('error')
+    }
   }
 
   const updateField = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -68,8 +84,8 @@ export default function ContactSection() {
                 <a
                   key={label}
                   href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target={href.startsWith('mailto:') ? undefined : '_blank'}
+                  rel={href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
                   data-magnetic
                   aria-label={label}
                   className="glass flex h-12 w-12 items-center justify-center rounded-full text-slate-300 transition-all hover:text-white hover:border-white/20"
@@ -124,11 +140,26 @@ export default function ContactSection() {
 
             <button
               type="submit"
+              disabled={status === 'sending'}
               data-magnetic
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accent-blue via-accent-purple to-accent-cyan px-7 py-4 font-body text-sm font-semibold text-white shadow-glow transition-all hover:shadow-glow-cyan"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accent-blue via-accent-purple to-accent-cyan px-7 py-4 font-body text-sm font-semibold text-white shadow-glow transition-all hover:shadow-glow-cyan disabled:cursor-not-allowed disabled:opacity-65"
             >
-              {sent ? 'Message sent!' : <><Send size={15} /> Send message</>}
+              {status === 'sending' && 'Sending...'}
+              {status === 'sent' && 'Message sent!'}
+              {status === 'error' && 'Try again'}
+              {status === 'idle' && <><Send size={15} /> Send message</>}
             </button>
+
+            {status === 'error' && (
+              <p className="font-body text-sm text-red-300">
+                Message could not be sent. Please email me at shabbirhnadaf@gmail.com.
+              </p>
+            )}
+            {status === 'sent' && (
+              <p className="font-body text-sm text-emerald-300">
+                Thanks. Your message has been sent.
+              </p>
+            )}
           </motion.form>
         </div>
       </div>
